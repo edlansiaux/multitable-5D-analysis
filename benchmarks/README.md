@@ -35,7 +35,7 @@ python benchmarks/plot_results.py results/full_benchmark.json
 - Scalabilité avec la taille des données
 
 ### Qualité
-- récision des relations découvertes
+- Précision des relations découvertes
 - Qualité des embeddings
 - Performance des prédictions
 
