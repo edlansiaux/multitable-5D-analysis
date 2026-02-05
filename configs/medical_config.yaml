@@ -1,0 +1,85 @@
+# Configuration pour le domaine médical
+pipeline:
+  name: "medical_analysis_pipeline"
+  version: "1.0.0"
+  description: "Pipeline d'analyse médicale multitable"
+  
+profiling:
+  volume_threshold_gb: 10
+  high_cardinality_threshold: 1000
+  temporal_pattern_detection: true
+  relationship_discovery: "auto"
+  
+hypergraph:
+  hyperedge_types:
+    - "explicit"
+    - "implicit"
+    - "temporal"
+    - "semantic"
+  max_nodes_per_hyperedge: 100
+  min_similarity_for_implicit: 0.7
+  
+embeddings:
+  pente:
+    node_dim: 128
+    relation_dim: 64
+    temporal_dim: 32
+    categorical_dim: 128  # Plus grand pour codes médicaux
+    volume_dim: 16
+    output_dim: 256
+    use_attention: true
+    
+  high_cardinality:
+    num_buckets: 50000
+    hierarchical_clustering: true
+    use_ontologies: true
+    
+models:
+  rht:
+    hidden_dim: 256
+    num_heads: 8
+    num_layers: 3
+    dropout: 0.1
+    graph_rewiring: true
+    
+  classifiers:
+    patient_readmission:
+      type: "binary"
+      positive_class_weight: 2.0
+      
+evaluation:
+  metrics:
+    - "accuracy"
+    - "f1"
+    - "roc_auc"
+    - "precision_at_k"
+    - "rare_category_recall"
+    
+  cross_validation:
+    n_splits: 5
+    stratified: true
+    
+optimization:
+  device: "cuda"  # ou "cpu"
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  early_stopping_patience: 10
+  
+logging:
+  wandb_project: "mt5d_medical"
+  log_level: "INFO"
+  save_checkpoints: true
+  checkpoint_dir: "./checkpoints"
+  
+data_preprocessing:
+  missing_values:
+    strategy: "impute"
+    method: "knn"
+    
+  normalization:
+    method: "standard"
+    
+  categorical_encoding:
+    high_cardinality: "hashing"
+    low_cardinality: "onehot"
