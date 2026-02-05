@@ -33,3 +33,13 @@ Si applicable, ajoutez des captures d'écran.
 Description des données utilisées (types, tailles, relations).
 
 **Logs d'Erreur**
+```bash
+Copiez les logs d'erreur ici
+```
+
+
+**Solution Proposée**
+Si vous avez une idée de solution.
+
+**Contexte Additionnel**
+Tout autre contexte sur le problème.
