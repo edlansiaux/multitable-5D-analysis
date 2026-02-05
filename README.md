@@ -20,6 +20,33 @@ pip install -e .
 pip install -e .[dev,docs,benchmarks]
 ```
 
+## Architecture
+```bash
+multitable-5D-analysis/
+├── .github/
+│   ├── workflows/           # CI/CD pipelines
+│   └── ISSUE_TEMPLATE/      # Templates GitHub
+├── docs/
+│   ├── api/                 # Documentation API
+│   ├── tutorials/           # Tutoriels pas-à-pas
+│   └── benchmarks/          # Résultats benchmarks
+├── examples/
+│   ├── medical/            # Exemple avec données MIMIC
+│   ├── financial/          # Exemple transactions financières
+│   └── ecommerce/          # Exemple e-commerce
+├── mt5d/
+│   ├── core/               # Modules principaux
+│   ├── models/             # Implémentations modèles
+│   ├── utils/              # Utilitaires
+│   ├── evaluation/         # Métriques et benchmarks
+│   └── datasets/           # Loaders datasets
+├── tests/                  # Tests unitaires et d'intégration
+├── benchmarks/             # Scripts de benchmarking
+├── docker/                 # Configuration Docker
+├── requirements/           # Requirements par environnement
+└── scripts/                # Scripts d'installation et déploiement
+```
+
 ## Quick start
 ```bash
 from mt5d import MT5DPipeline
