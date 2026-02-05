@@ -1,0 +1,24 @@
+# Configuration pour données financières
+pipeline:
+  name: "fraud_detection_pipeline"
+  version: "1.0.0"
+  
+profiling:
+  high_cardinality_threshold: 500
+  temporal_granularity: "millisecond"
+  
+hypergraph:
+  temporal_relationships: true
+  anomaly_detection: true
+  
+embeddings:
+  pente:
+    temporal_dim: 64  # Plus important en finance
+    
+models:
+  rht:
+    temporal_attention_heads: 4
+    
+  anomaly_detection:
+    contamination: 0.01
+    method: "isolation_forest"
