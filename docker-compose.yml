@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  mt5d-jupyter:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./:/app
+      - ./example_data:/app/example_data
+      - ./outputs:/app/outputs
+    environment:
+      - JUPYTER_TOKEN=mt5d2023
+      - WANDB_API_KEY=${WANDB_API_KEY}
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=mt5d2023
+    
+  mt5d-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    environment:
+      - MODEL_PATH=/app/models
+      - DATA_PATH=/app/data
+    command: uvicorn mt5d.api.main:app --host 0.0.0.0 --port 8000
+    
+  mt5d-tests:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ./:/app
+    command: pytest tests/ -v
+    
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow:/mlflow
+    command: mlflow server --backend-store-uri sqlite:///mlflow/mlflow.db --default-artifact-root /mlflow/artifacts --host 0.0.0.0 --port 5000
