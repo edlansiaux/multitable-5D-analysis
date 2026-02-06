@@ -4,6 +4,6 @@ try:
 except ImportError:
     # Fallback si le fichier s'appelle strcuture.py (typo observée)
     try:
-        from .strcuture import RelationalExplainer
+        from .structure import RelationalExplainer
     except ImportError:
         pass
