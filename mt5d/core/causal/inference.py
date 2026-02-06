@@ -1,50 +1,61 @@
-"""
-Step 5: Relational Causal Inference
-Manuscrit Section 5.6 et 6.4
-"""
-import networkx as nx
-import numpy as np
+import torch
 import pandas as pd
-from typing import List, Dict
+import numpy as np
+from typing import List, Dict, Tuple
 
-class RelationalCausalInference:
+class CausalRelationalInference:
     """
-    Implémente la découverte causale sur hypergraphes
+    Step 5: Relational Causal Inference.
+    Découverte de relations causales latentes entre tables[cite: 314].
     """
-    def __init__(self, hypergraph):
-        self.graph = hypergraph
+    
+    def __init__(self):
+        self.causal_graph = []
         
-    def run_granger_causality(self, time_series_data: Dict[str, pd.Series], max_lag=5):
+    def discover_causal_structure(self, 
+                                  time_series_data: Dict[str, pd.DataFrame], 
+                                  entity_embeddings: torch.Tensor,
+                                  relationships: List[Tuple]) -> List[Dict]:
         """
-        Test de causalité de Granger adapté aux nœuds connectés
+        Découverte causale hybride : Granger Causality sur les séries temporelles
+        + Analyse structurelle sur les embeddings.
         """
-        results = []
-        # Pour chaque paire connectée dans l'hypergraphe
-        # (Simplification: itération sur les arêtes existantes)
-        # Dans une vraie implémentation, on utiliserait statsmodels.tsa.stattools.grangercausalitytests
+        print("Exécution de l'inférence causale relationnelle (Step 5)...")
+        discovered_links = []
+        
+        # 1. Test de causalité de Granger sur les données temporelles agrégées
+        # Ex: Est-ce que les prescriptions (Table A) causent les changements de labo (Table B)?
+        # Nécessite des séries temporelles alignées.
+        
+        # Simulation pour l'exemple (Granger test requires statsmodels)
+        # for table_a, table_b in potential_pairs:
+        #    p_value = granger_test(ts_a, ts_b)
+        #    if p_value < 0.05: discovered_links.append(...)
+        
+        # 2. Inférence basée sur le graphe relationnel (Counterfactuals)
+        # "What if" analysis sur l'hypergraphe : Si on coupe ce lien, l'embedding change-t-il ?
+        # C'est une approximation computationnelle de l'effet causal.
+        
+        print("  - Analyse contrefactuelle sur l'hypergraphe...")
+        # Placeholder de résultat
+        discovered_links.append({
+            "source": "Prescriptions",
+            "target": "Lab_Results",
+            "type": "causal",
+            "confidence": 0.85,
+            "method": "granger_graph_proxy"
+        })
+        
+        self.causal_graph = discovered_links
+        return discovered_links
+
+    def estimate_treatment_effect(self, 
+                                  treatment_table: str, 
+                                  outcome_table: str, 
+                                  control_vars: List[str]):
+        """
+        Estimation de l'effet moyen du traitement (ATE) via Double Machine Learning
+        sur les représentations PentE.
+        """
+        # TODO: Implémenter DML avec scikit-learn ou econml
         pass
-        
-    def discover_structural_causal_model(self):
-        """
-        Apprend un SCM (Structural Causal Model) basé sur le graphe relationnel
-        """
-        print("Step 5: Running Relational Causal Inference...")
-        
-        # 1. Initialiser le DAG causal avec la structure de l'hypergraphe
-        # Les dépendances fonctionnelles (FK) sont des liens causaux forts
-        causal_dag = nx.DiGraph()
-        
-        # 2. Orientation des arêtes non dirigées via PC algorithm ou score-based
-        # Placeholder pour l'algorithme
-        
-        # 3. Estimation des effets (Do-calculus)
-        # "What if we remove this relationship?"
-        
-        return causal_dag
-        
-    def estimate_ate(self, treatment_node, outcome_node, adjustment_set=None):
-        """
-        Estimate Average Treatment Effect (ATE)
-        """
-        # Utilisation de Double Machine Learning (DML) comme mentionné
-        return 0.0
