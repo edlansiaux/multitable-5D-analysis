@@ -1,369 +1,63 @@
-# Configuration par défaut du framework MT5D
-# Version: 1.0.0
+# Configuration par défaut pour MT5D Framework
+# Section 5: Seven-Step Methodology
 
-# Configuration du pipeline
-pipeline:
-  name: "mt5d_default_pipeline"
-  version: "1.0.0"
-  description: "Pipeline d'analyse multitable 5D par défaut"
-  output_dir: "./mt5d_results"
-  
-  # Étapes à exécuter
-  steps:
-    - profiling
-    - validation
-    - hypergraph_construction
-    - embedding
-    - modeling
-    - evaluation
-    - visualization
+project_name: "mt5d_analysis"
+output_dir: "./outputs"
+seed: 42
 
-# Configuration du profilage
+# Step 0: Profiling
 profiling:
-  enabled: true
-  output_format: "json"
-  
-  # Seuils
-  thresholds:
-    high_cardinality: 1000  # Nombre de valeurs uniques
-    large_table: 1000000    # Nombre de lignes
-    many_variables: 100     # Nombre de colonnes
-    high_memory: 1073741824 # 1GB en bytes
-    
-  # Métriques à calculer
-  metrics:
-    - basic_stats
-    - data_types
-    - missing_values
-    - correlations
-    - temporal_patterns
-    - relationship_density
+  high_cardinality_threshold: 100
+  detect_temporal_columns: true
+  temporal_keywords: ["time", "date", "ts", "created_at"]
 
-# Configuration de la validation
-validation:
-  enabled: true
-  strict_mode: false
-  
-  checks:
-    - data_types
-    - missing_values
-    - outliers
-    - relationship_consistency
-    - schema_integrity
-
-# Configuration de l'hypergraphe
+# Step 1: Hypergraph Construction
 hypergraph:
-  enabled: true
-  
-  # Types de relations à inclure
-  relation_types:
-    - explicit  # Relations définies explicitement
-    - implicit  # Relations déduites par similarité
-    - temporal  # Relations temporelles
-    - semantic  # Relations sémantiques
-    
-  # Paramètres de construction
-  construction:
-    max_nodes_per_hyperedge: 100
-    min_similarity_for_implicit: 0.7
-    temporal_window_hours: 24
-    use_hierarchical_clustering: true
-    
-  # Optimisation
-  optimization:
-    prune_small_hyperedges: true
-    min_hyperedge_size: 2
-    merge_similar_hyperedges: true
-    similarity_threshold: 0.8
+  node_dim: 128
+  construction_mode: "adaptive" # options: adaptive, static
+  pruning_threshold: 0.1 # Pour le differentiable pruning (Algorithme 1)
 
-# Configuration des embeddings
-embeddings:
-  enabled: true
-  method: "pente"  # pentadimensional_embedding
+# Step 2: PentE Embeddings
+model:
+  architecture: "RHT"
+  input_dim: 128 # Doit matcher hypergraph.node_dim
+  hidden_dim: 256
+  output_dim: 64 # Dimension de l'espace latent final
+  dropout: 0.1
   
   pente:
-    # Dimensions
-    node_dim: 128
+    use_pente: true
     relation_dim: 64
     temporal_dim: 32
-    categorical_dim: 128
+    categorical_dim: 64
     volume_dim: 16
-    output_dim: 256
-    
-    # Architecture
     use_attention: true
-    num_attention_heads: 8
-    dropout: 0.1
-    
-    # Apprentissage
-    learning_rate: 0.001
-    weight_decay: 0.0001
-    epochs: 100
-    batch_size: 32
-    
-    # Perte
-    loss_weights:
-      reconstruction: 1.0
-      relational: 0.5
-      temporal: 0.3
-      categorical: 0.2
-      volume: 0.1
+
+# Step 3 & 4: Training & Rewiring
+training:
+  batch_size: 32
+  epochs: 50
+  learning_rate: 0.001
+  optimizer: "adamw"
+  weight_decay: 1e-4
   
-  # Alternatives
-  alternatives:
-    node2vec:
-      dimensions: 128
-      walk_length: 40
-      num_walks: 10
-      window_size: 10
-      
-    graphsage:
-      hidden_dims: [64, 128]
-      num_layers: 2
-      aggregator_type: "mean"
-
-# Configuration des modèles
-models:
-  default: "rht"  # relational_hypergraph_transformer
+  # Loss components (Eq 4)
+  alpha_task: 1.0
+  beta_sparse: 0.01
+  gamma_semantic: 0.1
   
-  rht:
-    # Architecture
-    input_dim: 256
-    hidden_dim: 512
-    output_dim: 128
-    num_layers: 3
-    num_heads: 8
-    dropout: 0.1
-    
-    # Apprentissage
-    learning_rate: 0.0005
-    weight_decay: 0.00001
-    epochs: 50
-    batch_size: 16
-    
-    # Fonctions de perte
-    loss_functions:
-      - name: "cross_entropy"
-        weight: 1.0
-      - name: "graph_regularization"
-        weight: 0.1
-        
-    # Optimisation
-    optimizer: "adamw"
-    scheduler: "cosine"
-    warmup_epochs: 5
-    
-  # Autres modèles disponibles
-  alternatives:
-    gcn:
-      hidden_dims: [64, 128, 256]
-      dropout: 0.2
-      
-    gat:
-      hidden_dims: [64, 128]
-      num_heads: [8, 1]
-      dropout: 0.3
-      
-    transformer:
-      hidden_dim: 512
-      num_layers: 6
-      num_heads: 8
-      ff_dim: 2048
+  # Graph Rewiring
+  enable_rewiring: true
+  rewiring_interval: 5 # Rewire tous les N epochs
 
-# Configuration de l'évaluation
-evaluation:
-  enabled: true
-  
-  # Métriques à calculer
-  metrics:
-    classification:
-      - accuracy
-      - precision
-      - recall
-      - f1_score
-      - roc_auc
-      - rare_category_recall
-      
-    regression:
-      - mse
-      - rmse
-      - mae
-      - r2_score
-      
-    clustering:
-      - silhouette_score
-      - adjusted_rand_score
-      - normalized_mutual_info
-      
-    relational:
-      - edge_density
-      - avg_degree
-      - clustering_coefficient
-      
-    temporal:
-      - mse_temporal
-      - mae_temporal
-      - event_detection_f1
-  
-  # Validation croisée
-  cross_validation:
-    enabled: true
-    n_splits: 5
-    stratified: true
-    random_state: 42
-    
-  # Benchmarking
-  benchmarking:
-    enabled: false
-    dataset_sizes: ["small", "medium", "large"]
-    repetitions: 3
+# Step 6: Federated Learning
+federated:
+  enabled: false
+  strategy: "fed_avg"
+  num_rounds: 10
+  clients_per_round: 3
 
-# Configuration de la visualisation
-visualization:
-  enabled: true
-  interactive: true
-  
-  # Types de visualisations
-  plots:
-    - dimension_radar
-    - hypergraph
-    - embedding_space
-    - correlation_matrix
-    - temporal_patterns
-    - loss_history
-    
-  # Paramètres
-  parameters:
-    figsize: [12, 8]
-    dpi: 100
-    style: "seaborn"
-    color_palette: "tab10"
-
-# Configuration du logging
-logging:
-  level: "INFO"
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-  
-  # Backends
-  backends:
-    - console
-    - file
-    
-  file:
-    path: "./logs/mt5d.log"
-    max_size_mb: 100
-    backup_count: 5
-    
-  # Integration avec outils externes
-  integrations:
-    wandb:
-      enabled: false
-      project: "mt5d"
-      entity: null
-      
-    mlflow:
-      enabled: false
-      tracking_uri: "http://localhost:5000"
-      experiment_name: "mt5d_experiments"
-
-# Configuration du système
-system:
-  # Hardware
-  device: "auto"  # auto, cpu, cuda, mps
-  num_workers: 4
-  pin_memory: true
-  
-  # Mémoire
-  memory:
-    max_gpu_memory_gb: 8
-    use_mixed_precision: true
-    
-  # Performance
-  performance:
-    use_caching: true
-    cache_dir: "./cache"
-    compression_level: 6
-
-# Configuration des données
-data:
-  # Formats supportés
-  supported_formats:
-    - parquet
-    - csv
-    - feather
-    - json
-    - hdf5
-    
-  # Préprocessing
-  preprocessing:
-    missing_values:
-      strategy: "impute"
-      method: "knn"
-      n_neighbors: 5
-      
-    normalization:
-      method: "standard"  # standard, minmax, robust
-      
-    categorical_encoding:
-      high_cardinality: "hashing"  # hashing, target, leave_one_out
-      low_cardinality: "onehot"    # onehot, ordinal
-      max_categories: 1000
-      
-    outlier_detection:
-      method: "iqr"  # iqr, isolation_forest, local_outlier_factor
-      contamination: 0.01
-      
-  # Augmentation (pour données limitées)
-  augmentation:
-    enabled: false
-    methods:
-      - smote
-      - adaSyn
-      - random_oversampling
-    ratio: 1.0
-
-# Tâches spécifiques
-tasks:
-  # Classification de patients
-  patient_classification:
-    target_column: "readmission_risk"
-    problem_type: "binary"
-    positive_class_weight: 2.0
-    
-  # Prédiction temporelle
-  temporal_prediction:
-    target_column: "next_value"
-    prediction_horizon: 24  # heures
-    sequence_length: 168    # heures (1 semaine)
-    
-  # Détection d'anomalies
-  anomaly_detection:
-    method: "isolation_forest"
-    contamination: 0.01
-    n_estimators: 100
-    
-  # Clustering relationnel
-  relational_clustering:
-    method: "dbscan"
-    min_samples: 5
-    eps: 0.5
-    metric: "cosine"
-
-# Extensions
-extensions:
-  # Modules additionnels
-  modules:
-    - name: "causal_inference"
-      enabled: false
-      
-    - name: "explainability"
-      enabled: true
-      method: "shap"
-      
-    - name: "federated_learning"
-      enabled: false
-      
-  # Plugins personnalisés
-  plugins:
-    - path: "./plugins/custom_models.py"
-      enabled: false
+# Step 7: Drift Detection
+monitoring:
+  drift_threshold: 0.1
+  reference_window_size: 1000
