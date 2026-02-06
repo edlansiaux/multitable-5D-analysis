@@ -1,13 +1,10 @@
-"""
-Fonctions de perte alignées avec le manuscrit (Sections 4.2.4 et 5.4)
-"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 class RelationalDiscoveryLoss(nn.Module):
     """
-    Definition 7 (Eq. 4): Relational Discovery Loss
+    Definition 7 (Eq 4): Relational Discovery Loss
     L_rel = alpha * L_task + beta * L_sparse + gamma * L_semantic
     """
     def __init__(self, alpha=1.0, beta=0.01, gamma=0.1):
@@ -15,66 +12,50 @@ class RelationalDiscoveryLoss(nn.Module):
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
-        self.task_loss = nn.CrossEntropyLoss() # Par défaut, adaptable
-
-    def forward(self, pred, target, adj_matrix, node_embeddings):
-        # 1. Task Loss (L_task)
+        self.task_loss = nn.CrossEntropyLoss()
+        
+    def forward(self, pred, target, adj_matrix, semantic_sim_matrix):
+        # 1. Task Loss
         l_task = self.task_loss(pred, target)
         
-        # 2. Sparsity Loss (L_sparse) - Pénalise la densité du graphe appris
-        # On suppose que adj_matrix contient des poids d'attention ou probabilités
+        # 2. Sparsity Loss (L1 sur la matrice d'adjacence apprise)
         l_sparse = torch.mean(torch.abs(adj_matrix))
         
-        # 3. Semantic Consistency (L_semantic)
-        # Les nœuds connectés doivent être sémantiquement proches
-        # On calcule la distance moyenne pondérée par l'adjacence
-        if adj_matrix.is_sparse:
-            adj_dense = adj_matrix.to_dense()
-        else:
-            adj_dense = adj_matrix
-            
-        # Similarité cosinus entre tous les nœuds (coûteux, simplifié ici pour l'exemple)
-        # Version optimisée : sampling d'arêtes
-        sim_matrix = F.cosine_similarity(node_embeddings.unsqueeze(1), node_embeddings.unsqueeze(0), dim=2)
-        # On veut maximiser la similarité là où adj est fort -> minimiser (1 - sim) * adj
-        l_semantic = torch.mean(adj_dense * (1 - sim_matrix))
-
+        # 3. Semantic Loss (Cohérence sémantique)
+        # On veut que les arêtes fortes (adj_matrix) correspondent à une similarité sémantique élevée
+        # Loss = sum(weight * (1 - semantic_sim))
+        l_semantic = torch.mean(adj_matrix * (1.0 - semantic_sim_matrix))
+        
         return self.alpha * l_task + self.beta * l_sparse + self.gamma * l_semantic
 
-class RelationalTemporalContrastiveLoss(nn.Module):
+class ContrastiveRelationalLoss(nn.Module):
     """
-    Definition 9 (Eq. 6): Relational-Temporal Contrastive Loss
-    L_CRT = alpha * L_rel + beta * L_temp + gamma * L_sem
+    Definition 9 (Eq 6): Relational-Temporal Contrastive Loss
     """
     def __init__(self, temperature=0.07):
         super().__init__()
         self.temperature = temperature
-
-    def forward(self, z, adj, temporal_sim):
+        
+    def forward(self, z_i, z_j, is_related):
         """
-        z: Embeddings [N, D]
-        adj: Matrice d'adjacence binaire ou pondérée [N, N] (Relations)
-        temporal_sim: Matrice de proximité temporelle [N, N]
+        z_i, z_j: Embeddings PentE de deux batchs d'entités
+        is_related: Masque binaire [batch, batch] indiquant si les entités sont liées
         """
-        # Similarité dans l'espace latent
-        sim = F.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=2) / self.temperature
+        # Similarité Cosinus
+        sim = F.cosine_similarity(z_i.unsqueeze(1), z_j.unsqueeze(0), dim=2) / self.temperature
+        
+        # Pour Contrastive Learning, on veut maximiser sim si is_related=1, minimiser sinon.
+        # Implémentation simplifiée type InfoNCE
         exp_sim = torch.exp(sim)
         
-        # Masque pour exclure self-loops
-        mask = torch.eye(z.shape[0], device=z.device).bool()
-        exp_sim.masked_fill_(mask, 0)
+        # Numérateur: exp(sim) pour les paires positives
+        pos_mask = is_related.bool()
+        numerator = exp_sim * pos_mask.float()
         
+        # Dénominateur: somme des exp(sim) pour tous
         denominator = exp_sim.sum(dim=1, keepdim=True)
         
-        # L_rel: Maximiser log-likelihood pour les voisins relationnels
-        log_prob = sim - torch.log(denominator + 1e-8)
-        # On ne garde que les paires positives (adj > 0)
-        l_rel = -(adj * log_prob).sum(dim=1) / (adj.sum(dim=1) + 1e-8)
+        # Log probability
+        log_prob = torch.log(numerator.sum(dim=1) / denominator + 1e-8)
         
-        # L_temp: Idem pour voisins temporels
-        l_temp = -(temporal_sim * log_prob).sum(dim=1) / (temporal_sim.sum(dim=1) + 1e-8)
-        
-        # L_sem: Encourager la cohérence intrinsèque (ex: via augmentation de données, simplifié ici)
-        l_sem = 0.0 # Placeholder pour terme sémantique pur
-        
-        return l_rel.mean() + l_temp.mean() + l_sem
+        return -log_prob.mean()
