@@ -1,31 +1,37 @@
-FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+# Dockerfile pour MT5D Analysis API
+FROM python:3.9-slim
 
-WORKDIR /app
+# Maintien des métadonnées
+LABEL maintainer="Edouard Lansiaux <edouard1.lansiaux@chu-lille.fr>"
+LABEL description="5D Multi-Table Analysis Framework API"
 
-# Installer les dépendances système
+# Installation des dépendances système
 RUN apt-get update && apt-get install -y \
+    build-essential \
     git \
-    curl \
-    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Copier les requirements
-COPY requirements.txt .
-COPY requirements-dev.txt .
+# Dossier de travail
+WORKDIR /app
 
-# Installer Python dependencies
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt && \
-    pip install -r requirements-dev.txt
+# Copie des fichiers de dépendances
+COPY setup.py .
+COPY mt5d/__init__.py mt5d/__init__.py
 
-# Copier le code
+# Installation des dépendances Python
+# Note: Pour la prod, on fixerait les versions dans requirements.txt
+# Ici on utilise setup.py pour installer les libs requises + FastAPI
+RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir torch dgl -f https://data.dgl.ai/wheels/repo.html
+
+# Copie du code source complet
 COPY . .
 
-# Installer en mode développement
-RUN pip install -e .
+# Création des dossiers de sortie
+RUN mkdir -p outputs configs
 
-# Exposer le port pour Jupyter/API
-EXPOSE 8888 8000
+# Exposition du port API
+EXPOSE 8000
 
-# Commande par défaut
-CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+# Commande de démarrage
+CMD ["python", "mt5d/api/main.py"]
