@@ -5,7 +5,8 @@ from typing import Dict, List, Optional
 
 class PentE(nn.Module):
     """
-    Pentadimensional Embedding: Combinaison de 5 dimensions
+    Pentadimensional Embedding (Section 5.3 & Eq 5)
+    Intègre : Sémantique, Relationnel, Temporel, Catégoriel, Volumétrique.
     """
     
     def __init__(self, 
@@ -18,7 +19,7 @@ class PentE(nn.Module):
                  use_attention: bool = True):
         super().__init__()
         
-        # Encodeurs pour chaque dimension
+        # 1. Dimension Sémantique (Attributs)
         self.node_encoder = nn.Sequential(
             nn.Linear(node_dim, 256),
             nn.ReLU(),
@@ -26,12 +27,19 @@ class PentE(nn.Module):
             nn.Linear(256, output_dim)
         )
         
-        self.relation_encoder = RelationEncoder(relation_dim, output_dim)
+        # 2. Dimension Relationnelle (Position structurelle)
+        self.relation_encoder = nn.Linear(relation_dim, output_dim)
+        
+        # 3. Dimension Temporelle (Time2Vec)
         self.temporal_encoder = TemporalEncoder(temporal_dim, output_dim)
+        
+        # 4. Dimension Catégorielle (Haute Cardinalité)
         self.categorical_encoder = HighCardinalityEncoder(categorical_dim, output_dim)
+        
+        # 5. Dimension Volumétrique (Stats de volume)
         self.volume_encoder = VolumeEncoder(volume_dim, output_dim)
         
-        # Mécanisme d'attention pour combinaison
+        # Mécanisme de fusion (Concaténation ou Attention)
         self.use_attention = use_attention
         if use_attention:
             self.dimension_attention = nn.MultiheadAttention(
@@ -40,7 +48,7 @@ class PentE(nn.Module):
                 batch_first=True
             )
         
-        # Combinaison finale
+        # Projection finale z_e
         self.combiner = nn.Sequential(
             nn.Linear(output_dim * 5 if not use_attention else output_dim, 512),
             nn.ReLU(),
@@ -53,111 +61,77 @@ class PentE(nn.Module):
                 node_features: torch.Tensor,
                 relation_features: torch.Tensor,
                 temporal_features: torch.Tensor,
-                categorical_features: torch.Tensor,
+                categorical_features: Dict[str, torch.Tensor],
                 volume_features: torch.Tensor) -> torch.Tensor:
-        """Forward pass pour PentE"""
         
-        # Encoder chaque dimension
-        h_node = self.node_encoder(node_features)
+        # Encodage individuel des 5 dimensions
+        h_sem = self.node_encoder(node_features)
         h_rel = self.relation_encoder(relation_features)
-        h_time = self.temporal_encoder(temporal_features)
+        h_temp = self.temporal_encoder(temporal_features)
         h_cat = self.categorical_encoder(categorical_features)
         h_vol = self.volume_encoder(volume_features)
         
         if self.use_attention:
-            # Combinaison par attention
-            dimensions = torch.stack([h_node, h_rel, h_time, h_cat, h_vol], dim=1)
+            # Stack pour attention: [batch, 5, dim]
+            dimensions = torch.stack([h_sem, h_rel, h_temp, h_cat, h_vol], dim=1)
             attended, _ = self.dimension_attention(dimensions, dimensions, dimensions)
             combined = attended.mean(dim=1)
         else:
-            # Concatenation simple
-            combined = torch.cat([h_node, h_rel, h_time, h_cat, h_vol], dim=-1)
+            # Concaténation (Eq 5)
+            combined = torch.cat([h_sem, h_rel, h_temp, h_cat, h_vol], dim=-1)
         
-        # Projection finale
-        output = self.combiner(combined)
-        
-        return output
+        return self.combiner(combined)
 
-class HighCardinalityEncoder(nn.Module):
-    """Encodeur spécialisé pour variables à haute cardinalité"""
-    
-    def __init__(self, input_dim: int, output_dim: int, 
-                 num_buckets: int = 10000):
-        super().__init__()
-        
-        self.num_buckets = num_buckets
-        self.embedding = nn.Embedding(num_buckets, output_dim)
-        
-        # Réseau pour features continues (si présentes)
-        self.continuous_encoder = nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, output_dim)
-        )
-        
-        self.combiner = nn.Linear(output_dim * 2, output_dim)
-        
-    def forward(self, categorical_features: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """Encode features catégorielles à haute cardinalité"""
-        
-        if "categorical_indices" in categorical_features:
-            # Méthode par embedding
-            indices = categorical_features["categorical_indices"]
-            emb = self.embedding(indices % self.num_buckets)
-        else:
-            # Initialisation aléatoire
-            batch_size = categorical_features.get("batch_size", 1)
-            emb = torch.randn(batch_size, self.embedding.embedding_dim)
-        
-        if "continuous_features" in categorical_features:
-            # Combiner avec features continues
-            cont_feat = categorical_features["continuous_features"]
-            cont_emb = self.continuous_encoder(cont_feat)
-            combined = torch.cat([emb, cont_emb], dim=-1)
-            output = self.combiner(combined)
-        else:
-            output = emb
-        
-        return output
-
-class TemporalEncoder(nn.Module):
-    """Encodeur temporel avec Time2Vec et attention temporelle"""
-    
+class VolumeEncoder(nn.Module):
+    """Encodeur pour la dimension volumétrique (stats d'agrégation)"""
     def __init__(self, input_dim: int, output_dim: int):
         super().__init__()
-        
-        # Time2Vec encoding
-        self.time2vec = nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.Sigmoid(),
-            nn.Linear(64, output_dim // 2)
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 32),
+            nn.Tanh(),
+            nn.Linear(32, output_dim)
         )
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+class HighCardinalityEncoder(nn.Module):
+    """
+    Section 6.2: Hierarchical High-Cardinality Encoding
+    Gère l'embedding composite : code + cluster + parent
+    """
+    def __init__(self, embedding_dim: int, output_dim: int, num_embeddings: int = 10000):
+        super().__init__()
+        # Embedding de base pour les codes
+        self.code_embedding = nn.Embedding(num_embeddings, embedding_dim)
+        # Embedding pour les clusters/parents (simplifié ici par un seul niveau hiérarchique)
+        self.hierarchy_embedding = nn.Embedding(num_embeddings // 10, embedding_dim)
         
-        # Attention temporelle
-        self.temporal_attention = nn.MultiheadAttention(
-            embed_dim=output_dim // 2,
-            num_heads=2,
-            batch_first=True
-        )
+        self.projection = nn.Linear(embedding_dim * 2, output_dim)
         
-        # Projection finale
-        self.projection = nn.Linear(output_dim // 2, output_dim)
+    def forward(self, features: Dict[str, torch.Tensor]) -> torch.Tensor:
+        # On attend 'indices' et 'parent_indices' dans le dict features
+        indices = features.get("indices", torch.zeros(1, dtype=torch.long))
+        parents = features.get("parents", torch.zeros(1, dtype=torch.long))
         
-    def forward(self, temporal_features: torch.Tensor) -> torch.Tensor:
-        """Encode features temporelles"""
+        # Eq 7: e_c = e_code + e_parent (simplifié ici en concat)
+        e_code = self.code_embedding(indices)
+        e_parent = self.hierarchy_embedding(parents)
         
-        # Time2Vec encoding
-        time_emb = self.time2vec(temporal_features)
+        return self.projection(torch.cat([e_code, e_parent], dim=-1))
+
+class TemporalEncoder(nn.Module):
+    """Section 4.2.2: Multi-Scale Temporal Embeddings (Time2Vec)"""
+    def __init__(self, input_dim: int, output_dim: int):
+        super().__init__()
+        self.output_dim = output_dim
+        # Composante linéaire (wot)
+        self.w0 = nn.Linear(input_dim, output_dim // 2) 
+        # Composante périodique (sin(wt))
+        self.w_periodic = nn.Linear(input_dim, output_dim // 2)
         
-        # Attention temporelle (si séquence)
-        if len(time_emb.shape) == 3:  # [batch, seq_len, features]
-            attended, _ = self.temporal_attention(time_emb, time_emb, time_emb)
-            # Pooling temporel
-            time_encoded = attended.mean(dim=1)
-        else:
-            time_encoded = time_emb
-        
-        # Projection finale
-        output = self.projection(time_encoded)
-        
-        return output
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Definition 5
+        linear = self.w0(x)
+        periodic = torch.sin(self.w_periodic(x))
+        return torch.cat([linear, periodic], dim=-1)
