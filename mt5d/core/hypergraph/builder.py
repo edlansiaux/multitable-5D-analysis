@@ -3,113 +3,125 @@ import dgl
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Any
-from dataclasses import dataclass
 from collections import defaultdict
-
-@dataclass
-class HyperEdge:
-    id: str
-    nodes: List[str]
-    type: str
-    weight: float = 1.0
 
 class RelationalHypergraphBuilder:
     """
-    Module 1: Hypergraph Construction (Algorithm 1)
+    Implémente l'Algorithme 1 : Adaptive Hypergraph Construction.
+    Transforme les tables relationnelles en un graphe bipartite (Entités <-> Hyperarêtes).
     """
     
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        self.hypergraph = None
-        # Initialisation du mapping des types d'arêtes
-        self._type_to_idx = {}
-        
+        self.node_dim = self.config.get('node_dim', 128)
+
     def build_from_tables(self, 
                          tables: Dict[str, pd.DataFrame],
-                         relationships: List[Tuple]) -> dgl.DGLGraph:
+                         relationships: List[Tuple[str, str, str, str]],
+                         temporal_columns: Dict[str, str] = None) -> dgl.DGLGraph:
         """
-        Construit l'hypergraphe selon l'Algorithme 1 du papier
+        Construit l'hypergraphe.
+        relationships format: [(table_src, col_src, table_tgt, col_tgt, type), ...]
         """
-        print("Step 1: Automated Hypergraph Construction...")
+        print(f"Construction de l'hypergraphe à partir de {len(tables)} tables...")
         
-        # 1. Extraction des entités (Nœuds)
-        nodes, node_features = self._create_nodes(tables)
+        # 1. Création des nœuds d'Entité
+        # Mapping: (table_name, row_idx) -> global_id
+        entity_mapping = {} 
+        entity_features = []
+        global_id_counter = 0
         
-        # 2. Création des hyperarêtes
-        hyperedges = self._create_hyperedges(tables, nodes, relationships)
-        
-        # 3. Construction DGL
-        g = self._build_dgl_graph(nodes, node_features, hyperedges)
-        
-        return g
-    
-    def _create_nodes(self, tables):
-        nodes = {}
-        node_features_list = []
-        global_idx = 0
-        
+        # Stocker les métadonnées pour reconstruire les tables plus tard si besoin
+        self.node_info = []
+
         for table_name, df in tables.items():
-            # Conversion simple des features numériques pour l'exemple
-            feats = df.select_dtypes(include=[np.number]).fillna(0).values
+            # Conversion basique des features numériques
+            numeric_df = df.select_dtypes(include=[np.number]).fillna(0)
+            feats = numeric_df.values
             
-            for i, row in enumerate(feats):
-                node_id = f"{table_name}_{i}"
-                nodes[node_id] = {
-                    "global_idx": global_idx,
-                    "table": table_name,
-                    "local_idx": i
-                }
-                # Padding ou truncation pour avoir dimension fixe
-                feat_vec = np.zeros(128) # Dim arbitraire fixe
-                dim = min(len(row), 128)
-                feat_vec[:dim] = row[:dim]
-                node_features_list.append(feat_vec)
+            for local_idx in range(len(df)):
+                entity_mapping[(table_name, local_idx)] = global_id_counter
+                self.node_info.append({'table': table_name, 'local_idx': local_idx})
                 
-                global_idx += 1
+                # Padding/Truncate features
+                f_vec = np.zeros(self.node_dim)
+                curr_f = feats[local_idx]
+                dim = min(len(curr_f), self.node_dim)
+                f_vec[:dim] = curr_f[:dim]
+                entity_features.append(f_vec)
                 
-        return nodes, torch.FloatTensor(np.array(node_features_list))
+                global_id_counter += 1
+                
+        num_entities = global_id_counter
+        print(f"  - {num_entities} entités créées.")
 
-    def _create_hyperedges(self, tables, nodes, relationships):
-        hyperedges = []
+        # 2. Création des Hyperarêtes (Nœuds de type 'hyperedge' dans le graphe bipartite)
+        # Pour simplifier, chaque relation FK crée une hyperarête binaire, 
+        # mais la structure permet des n-aires.
         
-        # Traitement des relations explicites (Foreign Keys)
+        src_nodes = [] # Entités
+        dst_nodes = [] # Hyperarêtes
+        he_features = [] # Features des hyperarêtes
+        
+        he_id_counter = 0
+        
+        # Traitement des FKs (Relations Explicites)
         for rel in relationships:
-            src_table, src_col, tgt_table, tgt_col, rel_type = rel
+            t_src, c_src, t_tgt, c_tgt, rel_type = rel
             
-            # Indexation des valeurs pour jointure rapide
-            src_vals = defaultdict(list)
-            tgt_vals = defaultdict(list)
+            if t_src not in tables or t_tgt not in tables:
+                continue
+                
+            # Jointure pour trouver les connexions
+            df_src = tables[t_src].reset_index()
+            df_tgt = tables[t_tgt].reset_index()
             
-            # ... Logique de remplissage des dictionnaires (simplifiée) ...
-            # Dans une version prod, on itérerait sur les DF directement
+            # On suppose que c_src et c_tgt contiennent les clés
+            merged = pd.merge(df_src, df_tgt, left_on=c_src, right_on=c_tgt, suffixes=('_s', '_t'))
             
-            if rel_type not in self._type_to_idx:
-                self._type_to_idx[rel_type] = len(self._type_to_idx)
-            
-            # Création fictive d'une arête pour l'exemple
-            # (L'implémentation complète nécessite une jointure Pandas efficace)
-            pass 
-            
-        return hyperedges
+            # Création des arêtes du graphe bipartite
+            for _, row in merged.iterrows():
+                idx_src = row['index_s'] # index original pandas (si reset_index préserve l'ordre 0..N)
+                idx_tgt = row['index_t']
+                
+                # IDs globaux des entités
+                u = entity_mapping.get((t_src, idx_src))
+                v = entity_mapping.get((t_tgt, idx_tgt))
+                
+                if u is not None and v is not None:
+                    # Créer un nœud Hyperarête H_i
+                    he_id = he_id_counter
+                    
+                    # Connecter u -> H_i et v -> H_i
+                    # Dans DGL bipartite: (u, v) où u type A, v type B
+                    src_nodes.extend([u, v])
+                    dst_nodes.extend([he_id, he_id])
+                    
+                    # Feature de l'hyperarête (ex: one-hot encoding du type de relation)
+                    he_vec = np.zeros(64) # Dim arbitraire
+                    # he_vec[type_id] = 1 ...
+                    he_features.append(he_vec)
+                    
+                    he_id_counter += 1
 
-    def _build_dgl_graph(self, nodes, node_features, hyperedges):
-        num_nodes = len(nodes)
+        print(f"  - {he_id_counter} hyperarêtes relationnelles détectées.")
+
+        # 3. Construction DGL (Hétérogène Bipartite)
+        # Graph data: { ('entity', 'in', 'hyperedge'): (u, v), ('hyperedge', 'con', 'entity'): (v, u) }
+        # Pour le RHT, on veut souvent faire passer les messages Entité -> Hyperarête -> Entité
         
-        # Si aucune arête n'est trouvée (cas edge), créer un graphe vide ou self-loops
-        if not hyperedges:
-            src = torch.arange(num_nodes)
-            dst = torch.arange(num_nodes)
+        data_dict = {
+            ('entity', 'part_of', 'hyperedge'): (torch.tensor(src_nodes).long(), torch.tensor(dst_nodes).long()),
+            ('hyperedge', 'contains', 'entity'): (torch.tensor(dst_nodes).long(), torch.tensor(src_nodes).long())
+        }
+        
+        g = dgl.heterograph(data_dict)
+        
+        # Attacher les features
+        g.nodes['entity'].data['feat'] = torch.FloatTensor(np.array(entity_features))
+        if he_features:
+            g.nodes['hyperedge'].data['feat'] = torch.FloatTensor(np.array(he_features))
         else:
-            # Convertir hyperedges en format d'adjacence pour graphe simple (expansion clique ou star)
-            # Pour RHT, on utilise souvent une expansion star avec des nœuds virtuels "Hyperedge"
-            # Ici, simplification vers un graphe homogène pour la démo
-            src, dst = [], []
-            # ... Logique de conversion ...
-            src = torch.tensor(src, dtype=torch.long)
-            dst = torch.tensor(dst, dtype=torch.long)
-
-        # Création graphe (homogène pour simplification dans ce snippet)
-        g = dgl.graph((src, dst), num_nodes=num_nodes)
-        g.ndata['feat'] = node_features
-        
+            g.nodes['hyperedge'].data['feat'] = torch.zeros((g.num_nodes('hyperedge'), 64))
+            
         return g
