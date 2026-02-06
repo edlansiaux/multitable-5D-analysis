@@ -1,5 +1,9 @@
-# Note: Vérifiez l'orthographe du fichier structure.py (anciennement strcuture.py)
+# Note : Gestion de la typo potentielle dans le nom de fichier structure.py
 try:
     from .structure import RelationalExplainer
 except ImportError:
-    pass
+    # Fallback si le fichier s'appelle strcuture.py (typo observée)
+    try:
+        from .strcuture import RelationalExplainer
+    except ImportError:
+        pass
