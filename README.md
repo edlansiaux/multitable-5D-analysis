@@ -5,7 +5,7 @@
 [![Docker](https://img.shields.io/badge/docker-ready-green.svg)](docker/Dockerfile)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](.github/workflows/ci.yml)
 
-[cite_start]**Official implementation of the paper:** *"Methodological and Conceptual Framework for 5D Multi-Table Analysis: A Unified Approach for Complex Data Reuse"*[cite: 1, 2].
+**Official implementation of the paper:** *"Methodological and Conceptual Framework for 5D Multi-Table Analysis: A Unified Approach for Complex Data Reuse"*.
 
 ## 📖 Overview
 
