@@ -1,24 +1,19 @@
-# Configuration pour données financières
-pipeline:
-  name: "fraud_detection_pipeline"
-  version: "1.0.0"
-  
-profiling:
-  high_cardinality_threshold: 500
-  temporal_granularity: "millisecond"
-  
+project_name: "financial_fraud_detection"
+
 hypergraph:
-  temporal_relationships: true
-  anomaly_detection: true
+  construction_mode: "static" # Structure transactionnelle fixe
+  node_dim: 64 # Dimensions réduites pour la vitesse
+
+model:
+  architecture: "RHT"
+  hidden_dim: 128
   
-embeddings:
   pente:
-    temporal_dim: 64  # Plus important en finance
-    
-models:
-  rht:
-    temporal_attention_heads: 4
-    
-  anomaly_detection:
-    contamination: 0.01
-    method: "isolation_forest"
+    temporal_dim: 16 # Suffisant pour timestamps simples
+    volume_dim: 32 # Important pour les montants agrégés
+    use_attention: false # Concaténation plus rapide
+
+training:
+  epochs: 10
+  batch_size: 1024 # Gros batchs pour le volume massif
+  alpha_task: 10.0 # Priorité à la classification (Fraude/Non-Fraude)
