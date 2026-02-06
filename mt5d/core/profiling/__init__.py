@@ -1,5 +1,2 @@
-"""
-Dimensional profiling module.
-"""
-
-from mt5d.core.profiling.dimensional_profiler import DimensionalProfiler, DimensionMetrics
+from .dimensional_profiler import DimensionalProfiler
+from .meta_profiler import MetaProfiler
