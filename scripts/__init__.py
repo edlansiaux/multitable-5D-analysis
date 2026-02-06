@@ -1,5 +1,6 @@
 from .benchmark_runner import run_benchmark
 from .download_example_data import main as download_data
+from .comparative_study import main as comparative_study
 
 # Si generate_docs.py a été créé
 try:
@@ -7,4 +8,4 @@ try:
 except ImportError:
     pass
 
-__all__ = ["run_benchmark", "download_data", "generate_docs"]
+__all__ = ["run_benchmark", "download_data", "generate_docs","comparative_study"]
