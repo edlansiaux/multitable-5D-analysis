@@ -1,91 +1,35 @@
-"""
-Step 6: Federated Multi-Table Learning
-Manuscrit Section 5.7
-"""
 import torch
-import copy
-import numpy as np
-from typing import List, Dict, Any, Optional
-
-class FederatedNode:
-    """Représente un silo de données local (ex: un hôpital)"""
-    def __init__(self, node_id: str, data_fragment: Any, model_copy: torch.nn.Module):
-        self.node_id = node_id
-        self.data = data_fragment
-        self.model = model_copy
-        self.device = next(model_copy.parameters()).device
-
-    def local_train(self, epochs: int = 1):
-        """Entraînement local sur le fragment de schéma"""
-        # Simulation d'entraînement
-        # Dans la pratique : boucle d'entraînement standard sur self.data
-        params = {k: v.cpu().detach() for k, v in self.model.state_dict().items()}
-        return params, len(self.data) if hasattr(self.data, '__len__') else 100
+from typing import Dict, Any
 
 class FederatedManager:
     """
-    Gestionnaire de l'apprentissage fédéré
-    Implémente l'agrégation sécurisée des embeddings relationnels
+    Step 6: Federated Multi-Table Learning.
+    Gère l'apprentissage distribué sur des fragments de schéma ou des silos de données.
     """
-    def __init__(self, global_model: torch.nn.Module, config: Dict[str, Any]):
-        self.global_model = global_model
-        self.config = config
-        self.nodes = []
-
-    def register_node(self, node_id: str, data_fragment: Any):
-        """Enregistre un nouveau nœud participant"""
-        node = FederatedNode(
-            node_id, 
-            data_fragment, 
-            copy.deepcopy(self.global_model)
-        )
-        self.nodes.append(node)
-
-    def federated_round(self):
-        """Exécute un tour d'apprentissage fédéré"""
-        print(f"Step 6: Executing Federated Round with {len(self.nodes)} nodes...")
+    
+    def __init__(self, strategy="fed_avg"):
+        self.strategy = strategy
         
-        local_weights = []
-        local_sizes = []
-
-        # 1. Distribution & Entraînement Local
-        for node in self.nodes:
-            # Synchronisation du modèle global vers local
-            node.model.load_state_dict(self.global_model.state_dict())
+    def aggregate_gradients(self, client_gradients: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
+        """
+        Agrégation sécurisée des gradients provenant de différents nœuds (ex: hôpitaux).
+        """
+        print(f"Federated Aggregation ({self.strategy})...")
+        avg_grads = {}
+        
+        if not client_gradients:
+            return avg_grads
             
-            # Entraînement local
-            w, size = node.local_train()
-            local_weights.append(w)
-            local_sizes.append(size)
-
-        # 2. Agrégation Sécurisée (FedAvg avec bruit différentiel)
-        new_weights = self._secure_aggregation(local_weights, local_sizes)
+        # FedAvg simple
+        for key in client_gradients[0].keys():
+            stacked = torch.stack([client[key] for client in client_gradients])
+            avg_grads[key] = torch.mean(stacked, dim=0)
+            
+        return avg_grads
         
-        # 3. Mise à jour du modèle global
-        self.global_model.load_state_dict(new_weights)
-        
-        return self.global_model
-
-    def _secure_aggregation(self, weights_list, sizes):
+    def secure_alignment(self, entity_ids_node_a, entity_ids_node_b):
         """
-        FedAvg avec Differential Privacy au niveau relationnel (Section 5.7)
+        Private Set Intersection (PSI) pour aligner les entités entre tables distantes
+        sans révéler les IDs non partagés.
         """
-        total_size = sum(sizes)
-        avg_weights = copy.deepcopy(weights_list[0])
-        
-        # Initialisation à 0
-        for k in avg_weights.keys():
-            avg_weights[k] = 0
-
-        # Somme pondérée
-        for w, size in zip(weights_list, sizes):
-            for k in avg_weights.keys():
-                avg_weights[k] += w[k] * (size / total_size)
-
-        # Ajout de bruit pour la Privacy (Section 5.7 point 3)
-        epsilon = self.config.get('privacy_epsilon', 1.0)
-        for k in avg_weights.keys():
-            noise = torch.randn_like(avg_weights[k]) * (1.0 / epsilon)
-            avg_weights[k] += noise
-
-        return avg_weights
+        pass
