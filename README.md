@@ -97,6 +97,7 @@ curl -X POST "http://localhost:8000/train" \
 ```
 
 ## 🏗️ Architecture
+```bash
 multitable-5d-analysis/
 ├── mt5d/
 │   ├── core/
@@ -114,6 +115,7 @@ multitable-5d-analysis/
 ├── docker/                 # Dockerfiles
 ├── examples/               # Domain-specific scripts
 └── tests/                  # Pytest suite
+```
 
 ## 📊 Benchmarks
 MT5D aims to surpass state-of-the-art methods (TGN, GraphSAGE) on complex multi-table tasks
@@ -124,6 +126,7 @@ python scripts/benchmark_runner.py --dataset synthetic_medical
 ```
 
 ## 🗺️ Roadmap & Status
+```bash
 [x] Core Framework: Pipeline, Profiler, Hypergraph Builder.
 [x] Models: PentE and RHT implementation (PyTorch/DGL).
 [x] Datasets: Loaders for MIMIC-IV, Amazon, and Finance.
@@ -131,16 +134,20 @@ python scripts/benchmark_runner.py --dataset synthetic_medical
 [ ] Optimization: Distributed training for >1TB datasets.
 [ ] Federated Learning: Full implementation of privacy-preserving cross-silo learning.
 [ ] LLM Integration: Text-to-SQL-to-Hypergraph interface.
-
+```
 ## 🤝 Contributing
 We welcome contributions! Please see CONTRIBUTING.md for details on how to submit pull requests, report issues, or request features.
 
 ## 📝 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE]() file for details.
 
+## 📄 Citation
+If you use this code in your research, please cite the following paper:
 ```bash
+@article{lansiaux2026mt5d,
+  title={Methodological and Conceptual Framework for 5D Multi-Table Analysis: A Unified Approach for Complex Data Reuse},
+  author={Lansiaux, Edouard},
+  journal={Preprint},
+  year={2026}
+}
 ```
-
-
-# Developer installation (with testing tools)
-pip install -e .[dev,docs]
