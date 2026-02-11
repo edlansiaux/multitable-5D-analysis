@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "multitable-5d-analysis"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100

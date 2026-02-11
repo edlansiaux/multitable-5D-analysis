@@ -1,0 +1,42 @@
+# Default configuration for the Relational Hypergraph Transformer
+# Corresponds to RHTConfig defaults
+
+# PentE embedding dimensions (Definition 5)
+semantic_dim: 128
+relational_dim: 64
+temporal_dim: 32
+categorical_dim: 64
+volume_dim: 16
+
+# Attention — Module 3 (Definition 3)
+num_attention_heads: 8
+attention_dropout: 0.1
+
+# Temporal — Module 2 (Definition 2)
+num_temporal_frequencies: 16
+
+# Discovery — Module 4 (Definition 4)
+discovery_alpha: 1.0
+discovery_beta: 0.1
+discovery_gamma: 0.05
+
+# Training
+learning_rate: 0.001
+weight_decay: 0.00001
+num_message_passing_layers: 3
+
+# Rare-category memory bank (Section 4.2.3)
+memory_bank_size: 1024
+few_shot_k: 5
+
+# Contrastive loss (Definition 6)
+contrastive_alpha: 1.0
+contrastive_beta: 0.5
+contrastive_gamma: 0.3
+contrastive_temperature: 0.07
+
+# Pipeline
+contrastive_epochs: 50
+profiling_sample_frac: 0.01
+profiling_max_sample: 10000
+pruning_threshold: 0.1
